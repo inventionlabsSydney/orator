@@ -20,6 +20,57 @@ class PostgresSchemaGrammar(SchemaGrammar):
 
     marker = "%s"
 
+    def compile_upsert(self, query, values, conflict_keys, conflict_columns):
+        """
+        Compile an upsert SQL statement
+
+        :param query: A QueryBuilder instance
+        :type query: QueryBuilder
+
+        :param values: The values to insert
+        :type values: dict or list
+
+        :param conflict_keys: The list of keys
+
+        :param conflict_columns: The columns to update on conflict
+        :type  conflict_columns: list
+
+        :return: The compiled statement
+        :rtype: str
+        """
+        # Essentially we will force every insert to be treated as a batch insert which
+        # simply makes creating the SQL easier for us since we can utilize the same
+        # basic routine regardless of an amount of records given to us to insert.
+        table = self.wrap_table(query.from__)
+
+        if not isinstance(values, list):
+            values = [values]
+
+        columns = self.columnize(values[0].keys())
+
+        # We need to build a list of parameter place-holders of values that are bound
+        # to the query. Each insert should have the exact same amount of parameter
+        # bindings so we can just go off the first list of values in this array.
+        parameters = self.parameterize(values[0].values())
+
+        value = ["(%s)" % parameters] * len(values)
+
+        parameters = ", ".join(value)
+
+        conflict_key_join = ", ".join(conflict_keys)
+        conflict_update_statements = [
+            "%s = EXCLUDED.%s" % (col, col) for col in conflict_columns
+        ]
+        conflict_update_join = ", ".join(conflict_update_statements)
+
+        return "INSERT INTO %s (%s) VALUES %s ON CONFLICT (%s) DO UPDATE SET %s" % (
+            table,
+            columns,
+            parameters,
+            conflict_key_join,
+            conflict_update_join,
+        )
+
     def compile_rename_column(self, blueprint, command, connection):
         """
         Compile a rename column command.

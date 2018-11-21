@@ -169,3 +169,14 @@ class ConnectionInterface(object):
 
     def pretend(self):
         raise NotImplementedError()
+
+    def on_duplicate(self, update_columns):
+        """
+        On primary Key conflict we upsert the columns listed in this function
+
+        :param update_columns: list of columns to update if conflict exists
+        :type update_columns: list
+
+        :return: mixed
+        """
+        raise NotImplementedError()
