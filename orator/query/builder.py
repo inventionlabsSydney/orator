@@ -1378,6 +1378,52 @@ class QueryBuilder(object):
 
         return self._connection.insert(sql, bindings)
 
+    def upsert(self, conflict_keys, conflict_columns, _values=None, **values):
+        """
+        Insert a new record into the database if conflict or duplicate happens update the given list
+
+        :param conflict_keys: List of keys that cause conflicts
+        :type  conflict_keys: list
+
+        :param conflict_columns: The list of columns to update on conflict
+        :type  conflict_columns: list
+
+        :param _values: The new record values
+        :type _values: dict or list
+
+        :param values: The new record values as keyword arguments
+        :type values: dict
+
+        :return: The result
+        :rtype: bool
+        """
+        if not values and not _values:
+            return True
+
+        if not isinstance(_values, list):
+            if _values is not None:
+                values.update(_values)
+
+            values = [values]
+        else:
+            values = _values
+            for i, value in enumerate(values):
+                values[i] = OrderedDict(sorted(value.items()))
+
+        bindings = []
+
+        for record in values:
+            for value in record.values():
+                bindings.append(value)
+
+        sql = self._grammar.compile_upsert(
+            self, values, conflict_keys, conflict_columns
+        )
+
+        bindings = self._clean_bindings(bindings)
+
+        return self._connection.insert(sql, bindings)
+
     def insert_get_id(self, values, sequence=None):
         """
         Insert a new record and get the value of the primary key
